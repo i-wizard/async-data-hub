@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Creates all shared async resources once per process so requests reuse pools,
     clients, and limiters instead of recreating expensive objects repeatedly.
     """
+    print("Starting up application and creating shared resources...")
 
     settings = get_settings()
     configure_logging(log_level=settings.log_level)
@@ -56,6 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    print("Shutting down application and cleaning up resources...")
     await http_client.aclose()
     await app.state.container.cache.aclose()
     await db_engine.dispose()

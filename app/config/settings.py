@@ -1,7 +1,7 @@
 from functools import lru_cache
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,7 +11,9 @@ class Settings(BaseSettings):
     created consistently during startup and reused across the entire process.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     app_name: str = Field(default="Async Data Hub", alias="APP_NAME")
     app_env: str = Field(default="development", alias="APP_ENV")
@@ -34,7 +36,31 @@ class Settings(BaseSettings):
         default=True,
         alias="ENABLE_IN_MEMORY_CACHE_FALLBACK",
     )
-    process_pool_workers: Optional[int] = Field(default=None, alias="PROCESS_POOL_WORKERS")
+    frontend_origins: List[str] = Field(
+        default=[
+            "http://127.0.0.1:5500",
+            "http://localhost:5500",
+            "http://127.0.0.1:8080",
+            "http://localhost:8080",
+            "http://localhost:63342",
+        ],
+        alias="FRONTEND_ORIGINS",
+    )
+    process_pool_workers: Optional[int] = Field(
+        default=None, alias="PROCESS_POOL_WORKERS"
+    )
+
+    @field_validator("frontend_origins", mode="before")
+    @classmethod
+    def parse_frontend_origins(cls, value):
+        """
+        Accepts either a list or a comma-separated env var so local frontend
+        origins can be configured simply without requiring JSON syntax.
+        """
+
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
 
 @lru_cache(maxsize=1)

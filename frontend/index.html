@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Async Data Hub UI</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <main class="page">
+        <header class="page-header">
+            <div>
+                <p class="eyebrow">Learning Frontend</p>
+                <h1>Async Data Hub</h1>
+                <p class="intro">
+                    A lightweight dashboard for exercising the async backend APIs:
+                    request/response, streaming, and live updates.
+                </p>
+            </div>
+            <section class="config-panel">
+                <label for="base-url">API Base URL</label>
+                <input id="base-url" name="base-url" type="text" value="http://localhost:8000/api/v1">
+                <p class="hint">All REST, SSE, and WebSocket endpoints derive from this value.</p>
+            </section>
+        </header>
+
+        <section class="grid">
+            <article class="panel" id="health-panel">
+                <div class="panel-header">
+                    <h2>Health</h2>
+                    <span class="status" data-status-for="health">idle</span>
+                </div>
+                <p class="hint">Check API, database, and cache readiness.</p>
+                <button type="button" id="health-button">Fetch health</button>
+                <pre id="health-output" class="output"></pre>
+            </article>
+
+            <article class="panel" id="aggregate-panel">
+                <div class="panel-header">
+                    <h2>Aggregate</h2>
+                    <span class="status" data-status-for="aggregate">idle</span>
+                </div>
+                <form id="aggregate-form" class="stack">
+                    <label for="aggregate-query">Query</label>
+                    <input id="aggregate-query" name="aggregate-query" type="text" value="tesla" required>
+                    <label class="checkbox">
+                        <input id="aggregate-cache" name="aggregate-cache" type="checkbox" checked>
+                        Use cache
+                    </label>
+                    <button type="submit">Run aggregation</button>
+                </form>
+                <pre id="aggregate-output" class="output"></pre>
+            </article>
+
+            <article class="panel" id="stream-panel">
+                <div class="panel-header">
+                    <h2>SSE Stream</h2>
+                    <span class="status" data-status-for="stream">idle</span>
+                </div>
+                <div class="stack">
+                    <label for="stream-query">Query</label>
+                    <input id="stream-query" name="stream-query" type="text" value="tesla">
+                    <div class="actions">
+                        <button type="button" id="stream-start">Start stream</button>
+                        <button type="button" id="stream-stop">Stop stream</button>
+                    </div>
+                </div>
+                <pre id="stream-output" class="output"></pre>
+            </article>
+
+            <article class="panel" id="websocket-panel">
+                <div class="panel-header">
+                    <h2>WebSocket Updates</h2>
+                    <span class="status" data-status-for="websocket">idle</span>
+                </div>
+                <div class="actions">
+                    <button type="button" id="websocket-connect">Connect</button>
+                    <button type="button" id="websocket-disconnect">Disconnect</button>
+                </div>
+                <pre id="websocket-output" class="output"></pre>
+            </article>
+
+            <article class="panel" id="webhook-panel">
+                <div class="panel-header">
+                    <h2>Webhook Fan-out</h2>
+                    <span class="status" data-status-for="webhook">idle</span>
+                </div>
+                <form id="webhook-form" class="stack">
+                    <label for="webhook-event-name">Event name</label>
+                    <input id="webhook-event-name" name="webhook-event-name" type="text" value="aggregate.completed" required>
+
+                    <label for="webhook-payload">Payload JSON</label>
+                    <textarea id="webhook-payload" name="webhook-payload" rows="6">{
+  "query": "tesla",
+  "source": "frontend"
+}</textarea>
+
+                    <label for="webhook-targets">Target URLs (one per line)</label>
+                    <textarea id="webhook-targets" name="webhook-targets" rows="4">http://localhost:8000/api/v1/mock-webhooks/success
+http://localhost:8000/api/v1/mock-webhooks/failure</textarea>
+
+                    <button type="submit">Trigger webhook event</button>
+                </form>
+                <pre id="webhook-output" class="output"></pre>
+            </article>
+
+            <article class="panel" id="analysis-panel">
+                <div class="panel-header">
+                    <h2>CPU Analysis</h2>
+                    <span class="status" data-status-for="analysis">idle</span>
+                </div>
+                <form id="analysis-form" class="stack">
+                    <label for="analysis-number">Fibonacci number</label>
+                    <input id="analysis-number" name="analysis-number" type="number" min="20" max="35" value="28">
+
+                    <label for="analysis-strategy">Strategy</label>
+                    <select id="analysis-strategy" name="analysis-strategy">
+                        <option value="blocking">blocking</option>
+                        <option value="threadpool">threadpool</option>
+                        <option value="processpool">processpool</option>
+                    </select>
+
+                    <button type="submit">Run analysis</button>
+                </form>
+                <pre id="analysis-output" class="output"></pre>
+            </article>
+        </section>
+    </main>
+
+    <script src="./app.js"></script>
+</body>
+</html>
