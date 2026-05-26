@@ -1,0 +1,54 @@
+Metadata-Version: 2.4
+Name: async-data-hub
+Version: 0.1.0
+Summary: Production-style async FastAPI project for learning concurrency patterns.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: aiosqlite>=0.20.0
+Requires-Dist: asyncpg>=0.29.0
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: httpx>=0.28.0
+Requires-Dist: pydantic-settings>=2.6.0
+Requires-Dist: redis>=5.2.0
+Requires-Dist: sqlalchemy>=2.0.36
+Requires-Dist: uvicorn[standard]>=0.32.0
+Provides-Extra: dev
+Requires-Dist: fakeredis>=2.26.0; extra == "dev"
+Requires-Dist: pytest>=8.3.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24.0; extra == "dev"
+
+# Async Data Hub
+
+Async Data Hub is a hands-on FastAPI project for learning production-style async backend engineering.
+
+## Run locally with Docker
+
+1. Copy `.env.example` to `.env` if you want to override defaults.
+2. Start the stack:
+
+```bash
+docker compose up --build
+```
+
+3. Open:
+   - API docs: `http://localhost:8000/docs`
+   - Health endpoint: `http://localhost:8000/api/v1/health`
+
+## Run tests locally
+
+```bash
+pip install -e .[dev]
+pytest
+```
+
+## Build order
+
+The project is organized so each feature demonstrates a specific async concept:
+- infrastructure and lifespan-managed shared resources
+- concurrent aggregation
+- SSE streaming
+- WebSocket broadcasting
+- Redis caching and request coalescing
+- durable async PostgreSQL access
+- webhook fan-out with limits and retries
+- CPU-bound offloading comparisons
