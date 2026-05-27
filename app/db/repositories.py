@@ -33,9 +33,9 @@ class AggregateRepository:
         """
 
         record = AggregateRequestRecord(query=query, status=status)
-        self._session.add(record)
-        await self._session.flush()
-        return record
+        self._session.add(record) # staged in memory only — no SQL yet
+        await self._session.flush() # grabs a db connection from the pool and emits INSERT now; DB assigns the PK
+        return record # record.id is now populated
 
     async def add_source_result(
         self,
@@ -60,7 +60,6 @@ class AggregateRepository:
             duration_ms=duration_ms,
         )
         self._session.add(record)
-        await self._session.flush()
         return record
 
     async def mark_request_complete(self, aggregate_request_id: int, status: str) -> None:

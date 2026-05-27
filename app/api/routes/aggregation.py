@@ -1,9 +1,13 @@
+import asyncio
+import time
+
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from app.config.dependencies import aggregation_service
-from app.schemas.aggregation import AggregationResponse
+from app.schemas.aggregation import AggregationResponse, SleepMode, SleepResult
 from app.services.aggregation_service import AggregationService
+from app.utils.logger import CustomLogger
 
 router = APIRouter()
 
@@ -45,3 +49,40 @@ async def aggregate_stream(
         _service.stream_aggregate(query=q),
         media_type="text/event-stream",
     )
+
+
+@router.get(
+    "/sleep/async",
+    response_model=SleepResult,
+    response_description="Sleep without blocking the event loop and report elapsed time",
+)
+async def sleep_async(seconds: float = Query(..., ge=0)) -> SleepResult:
+    """
+    Sleeps asynchronously for the requested seconds so the event loop stays free
+    to serve other requests, then reports how long the task actually took.
+    Use this scripts/load_test.py to compare how the async and sync variants handle load differently.
+    """
+    # CustomLogger.info("Starting async sleep for {seconds} seconds".format(seconds=seconds))
+    started_at = time.perf_counter()
+    await asyncio.sleep(seconds)
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+
+    return SleepResult(mode=SleepMode.ASYNC, requested_seconds=seconds, elapsed_ms=elapsed_ms)
+
+
+@router.get(
+    "/sleep/sync",
+    response_model=SleepResult,
+    response_description="Sleep on the worker thread and report elapsed time",
+)
+def sleep_sync(seconds: float = Query(..., ge=0)) -> SleepResult:
+    """
+    Sleeps with a blocking call to contrast with the async variant, then reports
+    how long the task actually took so the handling difference is visible.
+    """
+    # CustomLogger.info(f"Starting sync sleep for {seconds} seconds".format(seconds=seconds))
+    started_at = time.perf_counter()
+    time.sleep(seconds)
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+
+    return SleepResult(mode=SleepMode.SYNC, requested_seconds=seconds, elapsed_ms=elapsed_ms)

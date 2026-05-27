@@ -152,6 +152,12 @@ class AggregationService:
         """
 
         aggregate_request = await self._repository.create_request(query=query, status="RUNNING")
+        # (self._session.commit()) Commits the parent row now so the DB connection grabbed during flush returns to the pool
+        # during the slow upstream fan-out below. Holding it open across that wait
+        # pins one connection per in-flight request and starves the pool under load (many concurrent users).
+        # A connection is acquired during flush and only returned to the pool on commit,
+        # so flushing early and committing before the fan-out allows the workflow to scale even with a small connection pool (5 -15).
+        await self._session.commit()
         results: List[AggregationSourceResult] = []
 
         async def _run_source(source_name: str) -> None:

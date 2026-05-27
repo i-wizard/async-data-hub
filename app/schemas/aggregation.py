@@ -1,6 +1,28 @@
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
+
+
+class SleepMode(str, Enum):
+    """
+    Identifies whether a sleep ran on the event loop or blocked a worker thread
+    so the learner can tell the two handling styles apart in the response.
+    """
+
+    ASYNC = "async"
+    SYNC = "sync"
+
+
+class SleepResult(BaseModel):
+    """
+    Reports the requested versus measured sleep duration so async and sync route
+    handling can be compared directly on the same payload shape.
+    """
+
+    mode: SleepMode
+    requested_seconds: float
+    elapsed_ms: int
 
 
 class AggregationSourceResult(BaseModel):

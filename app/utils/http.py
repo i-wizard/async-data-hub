@@ -38,11 +38,12 @@ class SharedHttpClient:
             except asyncio.CancelledError:
                 raise
             except httpx.HTTPError as exc:
+                error_message = str(exc) or f"{type(exc).__name__} (no message)"
                 CustomLogger.warning(
                     "outbound_http_failure",
-                    extra={"url": url, "error": str(exc)},
+                    extra={"url": url, "error": error_message},
                 )
-                raise RuntimeError(str(exc)) from exc
+                raise RuntimeError(error_message) from exc
             finally:
                 duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
                 CustomLogger.info(

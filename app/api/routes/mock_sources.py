@@ -31,7 +31,7 @@ async def weather_source(q: str = Query(..., min_length=1)) -> Dict:
     differently timed sources to make concurrency visible.
     """
 
-    return await _mock_source_payload(source_name="weather", query=q, delay_seconds=0.1)
+    return await _mock_source_payload(source_name="weather", query=q, delay_seconds=1)
 
 
 @router.get(
@@ -45,7 +45,7 @@ async def news_source(q: str = Query(..., min_length=1)) -> Dict:
     show why streaming partial results is useful.
     """
 
-    return await _mock_source_payload(source_name="news", query=q, delay_seconds=0.2)
+    return await _mock_source_payload(source_name="news", query=q, delay_seconds=2)
 
 
 @router.get(

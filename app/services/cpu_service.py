@@ -3,6 +3,7 @@ from typing import Optional
 
 from app.core.state import AppState
 from app.schemas.analysis import AnalysisStrategy, HeavyAnalysisResponse
+from app.utils.logger import CustomLogger
 
 
 def nth_fibonacci(number: int) -> int:
@@ -38,8 +39,10 @@ class CpuAnalysisService:
 
         if strategy == AnalysisStrategy.BLOCKING:
             result = nth_fibonacci(number=number)
+            CustomLogger.info("Completed with blocking execution")
         elif strategy == AnalysisStrategy.THREADPOOL:
             result = await asyncio.to_thread(nth_fibonacci, number)
+            CustomLogger.info("Completed in thread pool")
         else:
             loop = asyncio.get_running_loop()
             process_pool = self._state.process_pool
@@ -47,5 +50,6 @@ class CpuAnalysisService:
                 result = await loop.run_in_executor(None, nth_fibonacci, number)
             else:
                 result = await loop.run_in_executor(process_pool, nth_fibonacci, number)
+            CustomLogger.info("Completed in process pool")
 
         return HeavyAnalysisResponse(strategy=strategy, number=number, result=result)
