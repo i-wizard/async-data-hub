@@ -4,6 +4,7 @@ import uuid
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.config.dependencies import websocket_manager
+from app.utils.logger import CustomLogger
 from app.websocket.manager import WebSocketManager
 
 router = APIRouter()
@@ -26,8 +27,12 @@ async def websocket_updates(
         async with asyncio.TaskGroup() as task_group:
             task_group.create_task(manager.sender_loop(client_id=client_id, connection=connection))
             task_group.create_task(manager.receive_loop(websocket=websocket))
-    except WebSocketDisconnect:
+    # TaskGroup re-raises child exceptions wrapped in ExceptionGroup, so a plain
+    # `except WebSocketDisconnect` would not match — use `except*` to unwrap.
+    except* WebSocketDisconnect:
+        CustomLogger.info(f"WebSocket client {client_id} disconnected")
         await manager.disconnect(client_id=client_id)
-    except asyncio.CancelledError:
+    except* asyncio.CancelledError:
+        CustomLogger.info(f"WebSocket client {client_id} cancelled")
         await manager.disconnect(client_id=client_id)
         raise

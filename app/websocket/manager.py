@@ -4,6 +4,8 @@ from typing import Dict, List
 
 from fastapi import WebSocket
 
+from app.utils.logger import CustomLogger
+
 
 @dataclass
 class ManagedConnection:
@@ -83,12 +85,14 @@ class WebSocketManager:
                 message = await connection.queue.get()
                 await connection.websocket.send_text(message)
         finally:
+            CustomLogger.info(f"WebSocket sender loop for client {client_id} terminated")
             await self.disconnect(client_id=client_id)
 
     async def receive_loop(self, websocket: WebSocket) -> None:
         """
         Keeps the socket alive by consuming inbound frames because many browsers
         and proxies expect read activity to continue during long-lived sessions.
+        Also receives the WebSocketDisconnect exception when the client disconnects so the sender loop can
         """
 
         while True:

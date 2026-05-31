@@ -20,7 +20,7 @@ class HeavyAnalysisRequest(BaseModel):
     differences with a tunable but bounded input size.
     """
 
-    number: int = Field(default=28, ge=20, le=350)
+    number: int = Field(default=28, ge=20, le=42)
     strategy: AnalysisStrategy
 
 

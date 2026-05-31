@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
     redis_url: str = Field(default="memory://", alias="REDIS_URL")
-    http_timeout_seconds: float = Field(default=5.0, alias="HTTP_TIMEOUT_SECONDS")
+    http_timeout_seconds: float = Field(default=50.0, alias="HTTP_TIMEOUT_SECONDSs")
     http_concurrency_limit: int = Field(default=10, alias="HTTP_CONCURRENCY_LIMIT")
     webhook_concurrency_limit: int = Field(default=5, alias="WEBHOOK_CONCURRENCY_LIMIT")
     websocket_queue_size: int = Field(default=20, alias="WEBSOCKET_QUEUE_SIZE")

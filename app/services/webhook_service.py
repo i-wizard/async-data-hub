@@ -46,55 +46,63 @@ class WebhookService:
             payload=data.payload,
             status="RUNNING",
         )
+        await self._session.commit()
         attempts: List[WebhookAttemptResponse] = []
 
         async def _deliver(target_url: str) -> None:
-            for attempt_number in [1, 2]:
-                try:
-                    async with self._state.webhook_limiter.slot():
-                        response = await self._http_client.post_json(url=target_url, payload=data.payload)
-                    attempt = await self._repository.add_attempt(
-                        webhook_event_id=event_record.id,
-                        target_url=target_url,
-                        attempt_number=attempt_number,
-                        status="success",
-                        response_status_code=response.status_code,
-                        error_message=None,
-                    )
-                    attempts.append(
-                        WebhookAttemptResponse(
-                            target_url=attempt.target_url,
-                            attempt_number=attempt.attempt_number,
-                            status=attempt.status,
-                            response_status_code=attempt.response_status_code,
-                        ),
-                    )
-                    await self._websocket_manager.broadcast(
-                        message='{"event":"webhook_delivery","target_url":"%s","status":"success"}' % target_url,
-                    )
-                    return
-                except asyncio.CancelledError:
-                    raise
-                except httpx.HTTPError as exc:
-                    failed_attempt = await self._repository.add_attempt(
-                        webhook_event_id=event_record.id,
-                        target_url=target_url,
-                        attempt_number=attempt_number,
-                        status="failed",
-                        response_status_code=getattr(exc.response, "status_code", None),
-                        error_message=str(exc),
-                    )
-                    attempts.append(
-                        WebhookAttemptResponse(
-                            target_url=failed_attempt.target_url,
-                            attempt_number=failed_attempt.attempt_number,
-                            status=failed_attempt.status,
-                            response_status_code=failed_attempt.response_status_code,
-                            error_message=failed_attempt.error_message,
-                        ),
-                    )
-                    if attempt_number == 1:
-                        await asyncio.sleep(0.1)
+            # Each delivery opens its own session because AsyncSession is not safe
+            # for concurrent use — concurrent flushes from sibling tasks on the same
+            # session raise "Session is already flushing".
+            async with self._state.session_factory() as session:
+                repo = WebhookRepository(session=session)
+                for attempt_number in [1, 2]:
+                    try:
+                        async with self._state.webhook_limiter.slot():
+                            response = await self._http_client.post_json(url=target_url, payload=data.payload)
+                        attempt = await repo.add_attempt(
+                            webhook_event_id=event_record.id,
+                            target_url=target_url,
+                            attempt_number=attempt_number,
+                            status="success",
+                            response_status_code=response.status_code,
+                            error_message=None,
+                        )
+                        await session.commit()
+                        attempts.append(
+                            WebhookAttemptResponse(
+                                target_url=attempt.target_url,
+                                attempt_number=attempt.attempt_number,
+                                status=attempt.status,
+                                response_status_code=attempt.response_status_code,
+                            ),
+                        )
+                        await self._websocket_manager.broadcast(
+                            message='{"event":"webhook_delivery","target_url":"%s","status":"success"}' % target_url,
+                        )
+                        return
+                    except asyncio.CancelledError:
+                        raise
+                    except httpx.HTTPError as exc:
+                        failed_attempt = await repo.add_attempt(
+                            webhook_event_id=event_record.id,
+                            target_url=target_url,
+                            attempt_number=attempt_number,
+                            status="failed",
+                            response_status_code=getattr(exc.response, "status_code", None),
+                            error_message=str(exc),
+                        )
+                        await session.commit()
+                        attempts.append(
+                            WebhookAttemptResponse(
+                                target_url=failed_attempt.target_url,
+                                attempt_number=failed_attempt.attempt_number,
+                                status=failed_attempt.status,
+                                response_status_code=failed_attempt.response_status_code,
+                                error_message=failed_attempt.error_message,
+                            ),
+                        )
+                        if attempt_number == 1:
+                            await asyncio.sleep(0.1)
 
         try:
             async with asyncio.TaskGroup() as task_group:

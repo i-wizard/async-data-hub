@@ -47,9 +47,16 @@ class CpuAnalysisService:
             loop = asyncio.get_running_loop()
             process_pool = self._state.process_pool
             if process_pool is None:
+                CustomLogger.info("Completed in default process pool")
                 result = await loop.run_in_executor(None, nth_fibonacci, number)
             else:
                 result = await loop.run_in_executor(process_pool, nth_fibonacci, number)
-            CustomLogger.info("Completed in process pool")
+                CustomLogger.info("Completed in process pool")
 
         return HeavyAnalysisResponse(strategy=strategy, number=number, result=result)
+
+    @staticmethod
+    def analyze_sync(number: int):
+        result = nth_fibonacci(number=number)
+        CustomLogger.info("Completed with blocking execution")
+        return HeavyAnalysisResponse(strategy=AnalysisStrategy.BLOCKING, number=number, result=result)

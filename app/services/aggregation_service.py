@@ -15,6 +15,7 @@ from app.schemas.aggregation import (
 )
 from app.streaming.sse import format_sse
 from app.utils.http import SharedHttpClient
+from app.utils.logger import CustomLogger
 from app.websocket.manager import WebSocketManager
 
 
@@ -138,12 +139,32 @@ class AggregationService:
                 event="completed",
             )
         except asyncio.CancelledError:
-            await self._repository.mark_request_complete(
-                aggregate_request_id=aggregate_request.id,
-                status="CANCELLED",
+            # Cancel the orphan producer (sync, no await) so its source tasks stop
+            # before the request session is torn down and they hit DetachedInstanceError.
+            producer_task.cancel()
+            # Schedule the DB cleanup in a detached task with a fresh session because
+            # Starlette wraps the request in an anyio CancelScope that keeps re-cancelling —
+            # any await on the request session here would re-raise CancelledError before
+            # the UPDATE could run, leaving the row stuck in RUNNING.
+            asyncio.create_task(
+                self._mark_cancelled_in_fresh_session(request_id=aggregate_request.id),
             )
-            await self._session.commit()
+            CustomLogger.info(f"Aggregation stream cancelled for request {aggregate_request.id}, cleanup scheduled")
             raise
+
+    async def _mark_cancelled_in_fresh_session(self, request_id: int) -> None:
+        """
+        Marks an aggregate request CANCELLED using a fresh session so the cleanup
+        survives the request's anyio cancel scope and its session teardown.
+        """
+
+        try:
+            async with self._state.session_factory() as session:
+                repo = AggregateRepository(session=session)
+                await repo.mark_request_complete(aggregate_request_id=request_id, status="CANCELLED")
+                await session.commit()
+        except Exception as exc:
+            CustomLogger.error(f"Failed to mark request {request_id} as CANCELLED: {exc}")
 
     async def _build_response_payload(self, query: str) -> Dict:
         """
@@ -170,11 +191,13 @@ class AggregationService:
                 for source_name in self.SOURCE_NAMES:
                     task_group.create_task(_run_source(source_name=source_name))
         except asyncio.CancelledError:
-            await self._repository.mark_request_complete(
-                aggregate_request_id=aggregate_request.id,
-                status="CANCELLED",
+            # Detach the cleanup from Starlette's anyio cancel scope and from the
+            # request session that's about to be torn down — same reasoning as
+            # stream_aggregate. An awaited cleanup here would never run the UPDATE.
+            asyncio.create_task(
+                self._mark_cancelled_in_fresh_session(request_id=aggregate_request.id),
             )
-            await self._session.commit()
+            CustomLogger.info(f"Aggregation cancelled for request {aggregate_request.id}, cleanup scheduled")
             raise
 
         status = "COMPLETED"
