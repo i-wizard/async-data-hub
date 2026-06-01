@@ -34,6 +34,7 @@ def test_aggregate_stream_emits_started_results_and_completed_events(client):
     """
 
     with client.stream("GET", AGGREGATE_STREAM_URL, params={"q": QUERY}) as response:
+        response.read()
         payload = response.text
 
     assert response.status_code == 200

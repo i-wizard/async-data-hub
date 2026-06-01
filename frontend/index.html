@@ -21,6 +21,14 @@
                 <label for="base-url">API Base URL</label>
                 <input id="base-url" name="base-url" type="text" value="http://localhost:8000/api/v1">
                 <p class="hint">All REST, SSE, and WebSocket endpoints derive from this value.</p>
+                <div class="metric-row">
+                    <div>
+                        <span class="metric-label">Active streams</span>
+                        <strong id="active-stream-count" class="metric-value">0</strong>
+                    </div>
+                    <button type="button" id="active-stream-refresh">Refresh</button>
+                </div>
+                <p id="active-stream-note" class="hint">Count comes from /streams/active.</p>
             </section>
         </header>
 
@@ -123,6 +131,49 @@ http://localhost:8000/api/v1/mock-webhooks/failure</textarea>
                     <button type="submit">Run analysis</button>
                 </form>
                 <pre id="analysis-output" class="output"></pre>
+            </article>
+
+            <article class="panel" id="media-panel">
+                <div class="panel-header">
+                    <h2>Media Streaming</h2>
+                    <span class="status" data-status-for="media">idle</span>
+                </div>
+                <p class="hint">
+                    Same file served two ways. Try seeking in both players — only
+                    the Range-aware one supports it.
+                </p>
+                <div class="stack">
+                    <div class="actions">
+                        <label for="media-file">File</label>
+                        <select id="media-file" name="media-file"></select>
+                        <button type="button" id="media-refresh">Refresh list</button>
+                    </div>
+
+                    <div>
+                        <p class="hint"><strong>Progressive</strong> (no seek)</p>
+                        <video id="media-progressive" controls preload="metadata" width="100%"></video>
+                    </div>
+
+                    <div>
+                        <p class="hint"><strong>Seekable</strong> (Range)</p>
+                        <video id="media-seekable" controls preload="metadata" width="100%"></video>
+                    </div>
+
+                    <div>
+                        <p class="hint"><strong>Remote URL</strong> (direct media link)</p>
+                        <label for="remote-media-url">URL</label>
+                        <input
+                            id="remote-media-url"
+                            name="remote-media-url"
+                            type="url"
+                            value="http://localhost:8000/api/v1/mock-sources/media.mp4"
+                            placeholder="https://example.com/video.mp4"
+                        >
+                        <button type="button" id="remote-media-load">Load remote media</button>
+                        <video id="remote-media-player" controls preload="metadata" width="100%"></video>
+                    </div>
+                </div>
+                <pre id="media-output" class="output"></pre>
             </article>
         </section>
     </main>

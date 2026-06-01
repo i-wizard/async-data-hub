@@ -8,6 +8,7 @@ app/api/routes/__init__.py
 app/api/routes/aggregation.py
 app/api/routes/analysis.py
 app/api/routes/health.py
+app/api/routes/media.py
 app/api/routes/mock_sources.py
 app/api/routes/mock_webhooks.py
 app/api/routes/webhooks.py
@@ -31,11 +32,13 @@ app/schemas/aggregation.py
 app/schemas/analysis.py
 app/schemas/common.py
 app/schemas/health.py
+app/schemas/media.py
 app/schemas/webhooks.py
 app/services/__init__.py
 app/services/aggregation_service.py
 app/services/cpu_service.py
 app/services/health_service.py
+app/services/media_service.py
 app/services/webhook_service.py
 app/streaming/__init__.py
 app/streaming/sse.py
@@ -55,6 +58,7 @@ tests/conftest.py
 tests/test_aggregation.py
 tests/test_analysis.py
 tests/test_health.py
+tests/test_media.py
 tests/test_webhooks.py
 tests/test_websocket.py
 tests/fixtures/__init__.py

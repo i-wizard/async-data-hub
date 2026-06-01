@@ -12,6 +12,7 @@ from app.core.state import AppState
 from app.db.base import create_database_engine, create_session_factory, create_tables
 from app.utils.concurrency import ConcurrencyLimiter
 from app.utils.logger import configure_logging
+from app.utils.stream_counter import StreamCounter
 from app.websocket.manager import WebSocketManager
 
 
@@ -36,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         redis_client = Redis.from_url(url=settings.redis_url, decode_responses=True)
 
     process_pool = None
-    if settings.process_pool_workers is not None:
+    if settings.process_pool_workers is not None and settings.process_pool_workers > 0:
         process_pool = ProcessPoolExecutor(max_workers=settings.process_pool_workers)
 
     app.state.container = AppState(
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         http_limiter=ConcurrencyLimiter(limit=settings.http_concurrency_limit),
         webhook_limiter=ConcurrencyLimiter(limit=settings.webhook_concurrency_limit),
         websocket_manager=WebSocketManager(queue_size=settings.websocket_queue_size),
+        stream_counter=StreamCounter(),
         process_pool=process_pool,
     )
 

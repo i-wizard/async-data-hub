@@ -41,4 +41,12 @@ python -m http.server 8080
 
 The UI defaults to `http://localhost:8000/api/v1` as its API base URL. You can change that value in the page when needed.
 
+## Media streaming samples
+
+The media-streaming endpoints serve files from `sample_media/` (configurable
+via `MEDIA_SAMPLES_DIR`). Drop one or more files with these extensions into
+that directory: `.mp4`, `.mp3`, `.webm`, `.ogg`, `.wav`, `.m4a`. They become
+available at `/api/v1/media/list` and the two streaming endpoints, and show
+up in the Media Streaming panel of the frontend after clicking *Refresh list*.
+
 ## Build order

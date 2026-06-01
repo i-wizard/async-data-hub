@@ -10,6 +10,7 @@ from app.core.state import AppState
 from app.services.aggregation_service import AggregationService
 from app.services.cpu_service import CpuAnalysisService
 from app.services.health_service import HealthService
+from app.services.media_service import MediaService
 from app.services.webhook_service import WebhookService
 from app.utils.http import SharedHttpClient
 from app.websocket.manager import WebSocketManager
@@ -129,3 +130,12 @@ def cpu_analysis_service(state: AppState = Depends(app_state)) -> CpuAnalysisSer
     """
 
     return CpuAnalysisService(state=state)
+
+
+def media_service(state: AppState = Depends(app_state)) -> MediaService:
+    """
+    Builds the media service from shared settings so the streaming endpoints
+    can resolve files and stream chunks without touching the filesystem directly.
+    """
+
+    return MediaService(state=state)

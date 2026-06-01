@@ -75,82 +75,83 @@ class AggregationService:
         concurrency in action rather than waiting for a full batch response.
         """
 
-        aggregate_request = await self._repository.create_request(query=query, status="RUNNING")
-        await self._session.commit()
-
-        yield format_sse(
-            AggregationStreamEvent(
-                request_id=aggregate_request.id,
-                event="started",
-                query=query,
-            ).model_dump(),
-            event="started",
-        )
-
-        queue: asyncio.Queue[AggregationStreamEvent] = asyncio.Queue(maxsize=len(self.SOURCE_NAMES) + 1)
-        completion_event = asyncio.Event()
-
-        async def _run_source(source_name: str) -> None:
-            result = await self._fetch_source(query=query, source_name=source_name)
-            await queue.put(
-                AggregationStreamEvent(request_id=aggregate_request.id, event="source_result", source=result.source, query=query, payload=result.data, error=result.error),
-            )
-            await self._broadcast_update(query=query, event_name="source_result", payload=result.model_dump())
-
-        async def _produce_results() -> None:
-            try:
-                async with asyncio.TaskGroup() as task_group:
-                    for source_name in self.SOURCE_NAMES:
-                        task_group.create_task(_run_source(source_name=source_name))
-            finally:
-                completion_event.set()
-
-        try:
-            producer_task = asyncio.create_task(_produce_results())
-
-            while True:
-                if completion_event.is_set() and queue.empty():
-                    break
-                event = await queue.get()
-                await self._repository.add_source_result(
-                    aggregate_request_id=aggregate_request.id,
-                    source_name=event.source or "unknown",
-                    status="success" if event.error is None else "error",
-                    payload=event.payload,
-                    error_message=event.error,
-                    duration_ms=None,
-                )
-                await self._session.commit()
-                yield format_sse(event.model_dump(), event=event.event)
-
-            await producer_task
-            await self._repository.mark_request_complete(
-                aggregate_request_id=aggregate_request.id,
-                status="COMPLETED",
-            )
+        async with self._state.stream_counter.track():
+            aggregate_request = await self._repository.create_request(query=query, status="RUNNING")
             await self._session.commit()
 
             yield format_sse(
                 AggregationStreamEvent(
                     request_id=aggregate_request.id,
-                    event="completed",
+                    event="started",
                     query=query,
                 ).model_dump(),
-                event="completed",
+                event="started",
             )
-        except asyncio.CancelledError:
-            # Cancel the orphan producer (sync, no await) so its source tasks stop
-            # before the request session is torn down and they hit DetachedInstanceError.
-            producer_task.cancel()
-            # Schedule the DB cleanup in a detached task with a fresh session because
-            # Starlette wraps the request in an anyio CancelScope that keeps re-cancelling —
-            # any await on the request session here would re-raise CancelledError before
-            # the UPDATE could run, leaving the row stuck in RUNNING.
-            asyncio.create_task(
-                self._mark_cancelled_in_fresh_session(request_id=aggregate_request.id),
-            )
-            CustomLogger.info(f"Aggregation stream cancelled for request {aggregate_request.id}, cleanup scheduled")
-            raise
+
+            queue: asyncio.Queue[AggregationStreamEvent] = asyncio.Queue(maxsize=len(self.SOURCE_NAMES) + 1)
+            completion_event = asyncio.Event()
+
+            async def _run_source(source_name: str) -> None:
+                result = await self._fetch_source(query=query, source_name=source_name)
+                await queue.put(
+                    AggregationStreamEvent(request_id=aggregate_request.id, event="source_result", source=result.source, query=query, payload=result.data, error=result.error),
+                )
+                await self._broadcast_update(query=query, event_name="source_result", payload=result.model_dump())
+
+            async def _produce_results() -> None:
+                try:
+                    async with asyncio.TaskGroup() as task_group:
+                        for source_name in self.SOURCE_NAMES:
+                            task_group.create_task(_run_source(source_name=source_name))
+                finally:
+                    completion_event.set()
+
+            producer_task = None
+            try:
+                producer_task = asyncio.create_task(_produce_results())
+
+                while True:
+                    if completion_event.is_set() and queue.empty():
+                        break
+                    event = await queue.get()
+                    await self._repository.add_source_result(
+                        aggregate_request_id=aggregate_request.id,
+                        source_name=event.source or "unknown",
+                        status="success" if event.error is None else "error",
+                        payload=event.payload,
+                        error_message=event.error,
+                        duration_ms=None,
+                    )
+                    await self._session.commit()
+                    yield format_sse(event.model_dump(), event=event.event)
+
+                await producer_task
+                await self._repository.mark_request_complete(
+                    aggregate_request_id=aggregate_request.id,
+                    status="COMPLETED",
+                )
+                await self._session.commit()
+
+                yield format_sse(
+                    AggregationStreamEvent(
+                        request_id=aggregate_request.id,
+                        event="completed",
+                        query=query,
+                    ).model_dump(),
+                    event="completed",
+                )
+            except asyncio.CancelledError:
+                if producer_task is not None:
+                    # Cancel the orphan producer (sync, no await) so its source tasks stop
+                    # before the request session is torn down and they hit DetachedInstanceError.
+                    producer_task.cancel()
+                # Schedule the DB cleanup in a detached task with a fresh session because
+                # Starlette wraps the request in an anyio CancelScope that keeps re-cancelling.
+                asyncio.create_task(
+                    self._mark_cancelled_in_fresh_session(request_id=aggregate_request.id),
+                )
+                CustomLogger.info(f"Aggregation stream cancelled for request {aggregate_request.id}, cleanup scheduled")
+                raise
 
     async def _mark_cancelled_in_fresh_session(self, request_id: int) -> None:
         """

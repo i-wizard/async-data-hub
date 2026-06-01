@@ -20,7 +20,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///{path}".format(path=database_path))
     monkeypatch.setenv("REDIS_URL", "memory://")
     monkeypatch.setenv("ENABLE_IN_MEMORY_CACHE_FALLBACK", "true")
-    monkeypatch.setenv("PROCESS_POOL_WORKERS", "2")
+    monkeypatch.setenv("PROCESS_POOL_WORKERS", "0")
+    monkeypatch.setenv("REMOTE_MEDIA_ALLOWED_HOSTS", "testserver")
     get_settings.cache_clear()
 
     app = create_app()

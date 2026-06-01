@@ -1,8 +1,8 @@
 from functools import lru_cache
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
         default=True,
         alias="ENABLE_IN_MEMORY_CACHE_FALLBACK",
     )
-    frontend_origins: List[str] = Field(
+    frontend_origins: Annotated[List[str], NoDecode] = Field(
         default=[
             "http://127.0.0.1:5500",
             "http://localhost:5500",
@@ -49,13 +49,36 @@ class Settings(BaseSettings):
     process_pool_workers: Optional[int] = Field(
         default=None, alias="PROCESS_POOL_WORKERS"
     )
+    media_samples_dir: str = Field(default="./sample_media", alias="MEDIA_SAMPLES_DIR")
+    media_chunk_size: int = Field(default=64 * 1024, alias="MEDIA_CHUNK_SIZE") # 64KB
+    remote_media_allowed_schemes: Annotated[List[str], NoDecode] = Field(
+        default=["http", "https"],
+        alias="REMOTE_MEDIA_ALLOWED_SCHEMES",
+    )
+    remote_media_allowed_hosts: Annotated[List[str], NoDecode] = Field(
+        default=[],
+        alias="REMOTE_MEDIA_ALLOWED_HOSTS",
+    )
+    remote_media_block_private_hosts: bool = Field(
+        default=True,
+        alias="REMOTE_MEDIA_BLOCK_PRIVATE_HOSTS",
+    )
+    remote_media_chunk_size: int = Field(
+        default=64 * 1024,
+        alias="REMOTE_MEDIA_CHUNK_SIZE",
+    )
 
-    @field_validator("frontend_origins", mode="before")
+    @field_validator(
+        "frontend_origins",
+        "remote_media_allowed_schemes",
+        "remote_media_allowed_hosts",
+        mode="before",
+    )
     @classmethod
-    def parse_frontend_origins(cls, value):
+    def parse_csv_list(cls, value):
         """
-        Accepts either a list or a comma-separated env var so local frontend
-        origins can be configured simply without requiring JSON syntax.
+        Accepts either a list or comma-separated env var so local development
+        settings stay readable without requiring JSON syntax in .env files.
         """
 
         if isinstance(value, str):

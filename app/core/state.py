@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, AsyncSession
 from app.cache.redis_cache import AsyncCache
 from app.config.settings import Settings
 from app.utils.concurrency import ConcurrencyLimiter
+from app.utils.stream_counter import StreamCounter
 from app.websocket.manager import WebSocketManager
 
 
@@ -26,4 +27,5 @@ class AppState:
     http_limiter: ConcurrencyLimiter
     webhook_limiter: ConcurrencyLimiter
     websocket_manager: WebSocketManager
+    stream_counter: StreamCounter
     process_pool: Optional[ProcessPoolExecutor]

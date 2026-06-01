@@ -4,6 +4,7 @@ Version: 0.1.0
 Summary: Production-style async FastAPI project for learning concurrency patterns.
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
+Requires-Dist: aiofiles>=23.2.0
 Requires-Dist: aiosqlite>=0.20.0
 Requires-Dist: asyncpg>=0.29.0
 Requires-Dist: fastapi>=0.115.0
@@ -19,7 +20,6 @@ Requires-Dist: pytest-asyncio>=0.24.0; extra == "dev"
 
 # Async Data Hub
 
-Async Data Hub is a hands-on FastAPI project for learning production-style async backend engineering.
 
 ## Run locally with Docker
 
@@ -37,18 +37,36 @@ docker compose up --build
 ## Run tests locally
 
 ```bash
-pip install -e .[dev]
+pip install -e ".[dev]"
 pytest
 ```
 
-## Build order
+## Run the frontend
 
-The project is organized so each feature demonstrates a specific async concept:
-- infrastructure and lifespan-managed shared resources
-- concurrent aggregation
-- SSE streaming
-- WebSocket broadcasting
-- Redis caching and request coalescing
-- durable async PostgreSQL access
-- webhook fan-out with limits and retries
-- CPU-bound offloading comparisons
+The lightweight frontend lives in `frontend/` and is intentionally plain HTML, CSS, and JavaScript.
+
+1. Start the backend:
+
+```bash
+docker compose up --build
+```
+
+2. Serve the frontend from the project root:
+
+```bash
+python -m http.server 8080
+```
+
+3. Open `http://localhost:8080/frontend/`
+
+The UI defaults to `http://localhost:8000/api/v1` as its API base URL. You can change that value in the page when needed.
+
+## Media streaming samples
+
+The media-streaming endpoints serve files from `sample_media/` (configurable
+via `MEDIA_SAMPLES_DIR`). Drop one or more files with these extensions into
+that directory: `.mp4`, `.mp3`, `.webm`, `.ogg`, `.wav`, `.m4a`. They become
+available at `/api/v1/media/list` and the two streaming endpoints, and show
+up in the Media Streaming panel of the frontend after clicking *Refresh list*.
+
+## Build order
