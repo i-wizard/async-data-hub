@@ -1,5 +1,3 @@
-from typing import AsyncIterator
-
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -55,4 +53,4 @@ async def create_tables(engine: AsyncEngine) -> None:
     from app.db import models  # noqa: F401
 
     async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+        await connection.run_sync(Base.metadata.create_all) 

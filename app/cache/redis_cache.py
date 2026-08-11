@@ -123,3 +123,24 @@ class AsyncCache:
 
         if self._redis_client is not None:
             await self._redis_client.aclose()
+
+    async def setnx(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> bool:
+        """
+        Sets a value in the cache only if the key does not already exist.
+        Returns True if the value was set, False if the key already exists.
+        """
+
+        ttl = ttl_seconds or self._default_ttl_seconds
+
+        if self._redis_client is not None:
+            result = await self._redis_client.set(name=key, value=json.dumps(value), ex=ttl, nx=True)
+            return result is True
+
+        if not self._allow_in_memory_fallback:
+            return False
+
+        async with self._lock:
+            if key in self._memory_store and self._memory_store[key]["expires_at"] >= time.time():
+                return False
+            self._memory_store[key] = {"value": value, "expires_at": time.time() + ttl}
+            return True
