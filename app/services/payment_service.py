@@ -1,9 +1,10 @@
+import asyncio
 import hashlib
 import json
 import uuid
 
 from fastapi import HTTPException
-from sqlalchemy import update
+from sqlalchemy import update, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +17,6 @@ from app.schemas.payment import (
     PaymentRequestProcessingStatus,
 )
 from app.utils.logger import CustomLogger
-
 
 _BALANCE_CHECK_CONSTRAINT = "ck_customer_accounts_balance_non_negative"
 _IDEMPOTENCY_UNIQUE_INDEX = "uq_charges_idempotency_key_succeeded"
@@ -57,6 +57,60 @@ class PaymentService:
         except (ValueError, TypeError):
             raise ValueError(f"Invalid customer_id: {customer_id}")
 
+    async def charge_with_bug(self, data: CreatePaymentRequest, idempotency_key: str, bug: str):
+        if bug == "replay":
+            result = await self.charge_count_with_replay_bug(data, idempotency_key)
+            return result.model_dump(mode="json")
+
+    async def charge_count_with_replay_bug(
+        self, data: CreatePaymentRequest, idempotency_key: str
+    ) -> PaymentResponse:
+        """sending two concurrent requests should succeed"""
+        customer_id = self._to_uuid(customer_id=data.customer_id)
+        charge = Charge(
+            amount=data.amount,
+            customer_id=customer_id,
+            status=ChargeStatus.SUCCEEDED,
+            idempotency_key=idempotency_key,
+        )
+        # `FOR UPDATE` locks the account row for the life of this transaction, so a
+        # concurrent request for the same customer blocks here until we commit and
+        # then reads the already-debited balance instead of the stale one.
+        print("Started processing charge with replay bug")
+        async with self._session.begin():
+            statement = (
+                select(CustomerAccount)
+                .where(CustomerAccount.id == customer_id)
+            )
+            # statement = (
+            #     select(CustomerAccount)
+            #     .where(CustomerAccount.id == customer_id)
+            #     .with_for_update()
+            # )
+            result = await self._session.execute(statement)
+            customer_account = result.scalar_one_or_none()
+            if customer_account is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Customer with id {data.customer_id} not found.",
+                )
+            print(f"Customer {customer_id} balance before charge: {customer_account.balance}")
+            if customer_account.balance < data.amount:
+                charge.status = ChargeStatus.FAILED
+                charge.error_message = "Insufficient balance"
+                self._session.add(charge)
+                # Flush so the column defaults (id, created_at) exist before the
+                # response is built; the enclosing block still commits on exit.
+                await self._session.flush()
+                return PaymentResponse.model_validate(charge)
+            # Held inside the transaction on purpose: the lock stays taken for the
+            # whole delay, which is what makes the serialization observable.
+            await asyncio.sleep(2)  # Simulate network delay
+            customer_account.balance -= data.amount
+            self._session.add(charge)
+        print(f"Customer {customer_id} balance after charge: {customer_account.balance}")
+        return PaymentResponse.model_validate(charge)
+
     async def charge_account(
         self, data: CreatePaymentRequest, idempotency_key: str
     ) -> PaymentResponse:
@@ -72,8 +126,9 @@ class PaymentService:
             amount=data.amount,
             customer_id=customer_id,
             status=ChargeStatus.SUCCEEDED,
-            idempotency_key=idempotency_key
+            idempotency_key=idempotency_key,
         )
+        await asyncio.sleep(2) # simulate network delay
         try:
             async with self._session.begin():
                 statement = (
@@ -110,7 +165,6 @@ class PaymentService:
             CustomLogger.error(f"Unexpected integrity error on charge: {exc}")
             raise
 
-        await self._session.refresh(charge)
         return PaymentResponse.model_validate(charge)
 
     @staticmethod
@@ -130,7 +184,7 @@ class PaymentService:
 
     async def charge_with_idempotency(
         self, data: CreatePaymentRequest, idempotency_key: str
-    ):
+    ) -> dict:
         """
         Charge a customer's account with idempotency handling.
         """
@@ -159,6 +213,7 @@ class PaymentService:
         )
         try:
             response = await self.charge_account(data, idempotency_key)
+            response = response.model_dump(mode="json")
         except Exception:
             # The operation failed, so nothing was durably done from the client's
             # point of view. Release the key so a genuine retry can proceed
@@ -172,7 +227,7 @@ class PaymentService:
             {
                 "status": PaymentRequestProcessingStatus.completed.value,
                 "fingerprint": fingerprint,
-                "response": response
+                "response": response,
             }
         )
         await self._cache.set(
@@ -210,5 +265,5 @@ class PaymentService:
 
         # If the status is completed, we can replay the response
         response = existing_record.get("response")
-        response['idempotent_replayed'] = True
+        response["idempotent_replayed"] = True
         return response

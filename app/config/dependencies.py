@@ -11,6 +11,7 @@ from app.services.aggregation_service import AggregationService
 from app.services.cpu_service import CpuAnalysisService
 from app.services.health_service import HealthService
 from app.services.media_service import MediaService
+from app.services.payment_service import PaymentService
 from app.services.webhook_service import WebhookService
 from app.utils.http import SharedHttpClient
 from app.websocket.manager import WebSocketManager
@@ -139,3 +140,15 @@ def media_service(state: AppState = Depends(app_state)) -> MediaService:
     """
 
     return MediaService(state=state)
+
+def payment_service(
+    state: AppState = Depends(app_state),
+    session: AsyncSession = Depends(db_session),
+    cache: AsyncCache = Depends(cache_client),
+) -> PaymentService:
+    """
+    Provides the payment service through dependency injection so payment logic
+    can reuse the shared database session and cache.
+    """
+
+    return PaymentService(session=session, cache=cache)

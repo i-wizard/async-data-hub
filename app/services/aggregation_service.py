@@ -18,7 +18,6 @@ from app.utils.http import SharedHttpClient
 from app.utils.logger import CustomLogger
 from app.websocket.manager import WebSocketManager
 
-
 class AggregationService:
     """
     Orchestrates multi-source fan-out so the project demonstrates structured

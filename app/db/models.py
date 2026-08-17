@@ -96,7 +96,8 @@ class CustomerAccount(Base):
         CheckConstraint("balance >= 0", name="ck_customer_accounts_balance_non_negative"),
     )
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid7)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
     balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # minor units (cents)
 
 
