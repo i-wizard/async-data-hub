@@ -129,3 +129,38 @@ class Charge(Base):
     )
     idempotency_key: Mapped[str] = mapped_column(String, nullable=False)
     error_message: Mapped[str] = mapped_column(String, nullable=True)
+
+
+
+class Product(Base):
+    """
+    The Product model — the CONTENDED resource in every atomic-operations demo.
+
+    `stock` is what concurrent reservations fight over; overselling it (letting the
+    total reserved exceed what existed) is the bug we are preventing.
+
+    `version` is the optimistic-locking counter: it is bumped on every successful
+    update, so a writer can detect that the row changed under it since it read.
+    """
+
+    __tablename__ = "products"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    stock: Mapped[int] = mapped_column(Integer, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class ProductReservation(Base):
+    """
+    The Reservation model — the SIDE EFFECT that proves correctness.
+
+    Each successful reservation inserts one row. The oversell check is simple: the
+    sum of reserved quantities must never exceed the stock that originally existed.
+    Counting rows is how the demos/tests detect a race that let too many through.
+    """
+    __tablename__ = "product_reservations"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False, index=True)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=current_datetime)

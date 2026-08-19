@@ -34,7 +34,7 @@ class AggregateRepository:
 
         record = AggregateRequestRecord(query=query, status=status)
         self._session.add(record) # staged in memory only — no SQL yet
-        await self._session.flush() # grabs a db connection from the pool and emits INSERT now; DB assigns the PK
+        await self._session.flush() # grabs a db connection from the pool and emits INSERT now; DB assigns the PK but object is not committed yet
         return record # record.id is now populated
 
     async def add_source_result(

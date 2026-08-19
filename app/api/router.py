@@ -10,6 +10,7 @@ from app.api.routes.streams import router as streams_router
 from app.api.routes.webhooks import router as webhooks_router
 from app.api.routes.websocket import router as websocket_router
 from app.api.routes.payment import router as payment_router
+from app.api.routes.inventory import router as inventory_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router, tags=["health"])
@@ -22,3 +23,4 @@ api_router.include_router(mock_sources_router, tags=["mock-sources"])
 api_router.include_router(mock_webhooks_router, tags=["mock-webhooks"])
 api_router.include_router(websocket_router, tags=["websocket"])
 api_router.include_router(payment_router, tags=["payments"])
+api_router.include_router(inventory_router, tags=["inventory"])

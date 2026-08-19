@@ -5,7 +5,7 @@ CMD ?= bash
 .PHONY: up down exec shell load-customers simulate-payments
 
 up:
-	$(COMPOSE) up --build -d
+	$(COMPOSE) up --build
 
 # Wipe the postgres data too with: make down V=1
 down:

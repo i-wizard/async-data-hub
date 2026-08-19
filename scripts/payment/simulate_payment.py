@@ -31,7 +31,7 @@ from app.db.models import Charge, CustomerAccount
 from app.schemas.payment import ChargeStatus
 
 BASE_URL = "http://127.0.0.1:8000"
-ENDPOINT = "/api/v1/payments/buggy"
+ENDPOINT = "/api/v1/payments"
 IDEMPOTENT_REPLAY_HEADER = "X-Idempotent-Replayed"
 REQUEST_TIMEOUT_SECONDS = 30.0
 
@@ -258,6 +258,34 @@ async def concurrent_payment_with_same_idempotency_key_and_same_payload() -> boo
         results=results,
     )
 
+async def concurrent_payment_with_same_idempotency_key_for_an_already_successful_payment():
+    "same user with same key, one should succeed, the other should be idempotent replay"
+
+    starting_balance = 500
+    customer_id = await _seed_customer(
+        name="sim-same-key-same-payload", balance=starting_balance
+    )
+    idempotency_key = _new_key()
+    calls = [
+        Call(label="first", amount=100, idempotency_key=idempotency_key),
+        Call(label="second", amount=100, idempotency_key=idempotency_key),
+    ]
+
+    # Fire the first call to create a successful payment
+    await _fire_concurrently(customer_id=customer_id, calls=[calls[0]])
+
+    # Fire the second call to test idempotent replay
+    results = await _fire_concurrently(customer_id=customer_id, calls=[calls[1]])
+    return await _report(
+        title="6. same idempotency key for an already successful payment",
+        expectation=(
+            "the second call replays the first successful payment"
+        ),
+        customer_id=customer_id,
+        starting_balance=starting_balance,
+        expected_charges=1,
+        results=results,
+    )
 
 async def concurrent_payment_with_same_idempotency_key_with_different_payload() -> bool:
     "same user with same key, different payload, one should succeed, the other should fail"
@@ -366,7 +394,8 @@ SCENARIOS = [
     # concurrent_payment_with_same_idempotency_key_with_different_payload,
     # concurrent_payment_with_different_idempotency_keys,
     # concurrent_same_user_with_different_idempotency_keys_and_same_payload,
-    concurrent_same_user_with_two_payment_amount_whose_sum_should_exceed_limit,
+    # concurrent_same_user_with_two_payment_amount_whose_sum_should_exceed_limit,
+concurrent_payment_with_same_idempotency_key_for_an_already_successful_payment
 ]
 
 

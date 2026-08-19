@@ -173,7 +173,7 @@ class AggregationService:
         """
 
         aggregate_request = await self._repository.create_request(query=query, status="RUNNING")
-        # (self._session.commit()) Commits the parent row now so the DB connection grabbed during flush returns to the pool
+        # (self._session.commit()) Commits the parent row and ends any open transaction so the DB connection grabbed during flush returns to the pool
         # during the slow upstream fan-out below. Holding it open across that wait
         # pins one connection per in-flight request and starves the pool under load (many concurrent users).
         # A connection is acquired during flush and only returned to the pool on commit,

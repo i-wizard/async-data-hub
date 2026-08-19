@@ -10,6 +10,7 @@ from app.core.state import AppState
 from app.services.aggregation_service import AggregationService
 from app.services.cpu_service import CpuAnalysisService
 from app.services.health_service import HealthService
+from app.services.inventory_service import InventoryService
 from app.services.media_service import MediaService
 from app.services.payment_service import PaymentService
 from app.services.webhook_service import WebhookService
@@ -35,7 +36,9 @@ def app_state(connection: HTTPConnection) -> AppState:
     return connection.app.state.container
 
 
-async def db_session(state: AppState = Depends(app_state)) -> AsyncIterator[AsyncSession]:
+async def db_session(
+    state: AppState = Depends(app_state),
+) -> AsyncIterator[AsyncSession]:
     """
     Provides one async database session per request so transactions stay scoped
     and predictable even when services perform concurrent I/O elsewhere.
@@ -141,6 +144,7 @@ def media_service(state: AppState = Depends(app_state)) -> MediaService:
 
     return MediaService(state=state)
 
+
 def payment_service(
     state: AppState = Depends(app_state),
     session: AsyncSession = Depends(db_session),
@@ -152,3 +156,15 @@ def payment_service(
     """
 
     return PaymentService(session=session, cache=cache)
+
+
+def inventory_service(
+    session: AsyncSession = Depends(db_session),
+    cache: AsyncCache = Depends(cache_client),
+) -> InventoryService:
+    """
+    Provides the inventory service through dependency injection so inventory logic
+    can reuse the shared database session and cache.
+    """
+
+    return InventoryService(session=session, cache=cache)
