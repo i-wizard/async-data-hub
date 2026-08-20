@@ -5,7 +5,7 @@ from typing import List
 import httpx
 
 # A small stock with more buyers than units -> a real fight for the last items.
-INITIAL_STOCK = 20
+INITIAL_STOCK = 3
 CONCURRENCY = 10
 
 BASE_URL = "http://localhost:8000/api/v1/inventory"
@@ -121,6 +121,28 @@ async def pessimistic() -> None:
         assert count == INITIAL_STOCK      # no oversell
         assert final_stock == 0
         print(f"\n✅ Exactly {INITIAL_STOCK} reserved (pessimistic lock); no oversell.")
+
+async def atomic() -> None:
+    async with httpx.AsyncClient(base_url=BASE_URL, timeout=30.0) as client:
+        product = await create_product(client, name="widget", stock=INITIAL_STOCK)
+        pid = product["id"]
+
+        responses = await reserve_concurrently(client, pid, "atomic", concurrency_number=CONCURRENCY)
+        successes = sum(1 for r in responses if r.status_code == 200)
+
+        final_stock = await product_stock(client, pid)
+        count = await reservation_count(client, pid)
+        print(f"initial stock       : {INITIAL_STOCK}")
+        print(f"concurrent buyers   : {CONCURRENCY}")
+        print(f"status codes        : {status_breakdown(responses)}")
+        print(f"successful reserves : {successes}")
+        print(f"reservations created: {count}")
+        print(f"final stock         : {final_stock}")
+
+        assert successes == INITIAL_STOCK
+        assert count == INITIAL_STOCK      # no oversell
+        assert final_stock == 0
+        print(f"\n✅ Exactly {INITIAL_STOCK} reserved (single atomic UPDATE); no oversell.")
 
 if __name__ == "__main__":
     asyncio.run(pessimistic())

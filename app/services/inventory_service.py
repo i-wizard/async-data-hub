@@ -84,6 +84,7 @@ class InventoryService:
             ReserveStrategy.NAIVE: self._reserve_naive,
             ReserveStrategy.OPTIMISTIC: self._reserve_optimistic,
             ReserveStrategy.PESSIMISTIC: self._reserve_pessimistic,
+            ReserveStrategy.ATOMIC: self.reserve_atomic,
         }
         return await handlers[strategy](product_id, quantity)
 
@@ -194,6 +195,37 @@ class InventoryService:
             return await self._record_reservation(
                 product_id=product_id, quantity=quantity
             )
+    async def reserve_atomic(self, product_id: str, quantity: int):
+        """
+        One UPDATE ... SET stock=stock-qty WHERE stock>=qty (DB does CAS).
+
+        The database itself does the atomic check-and-set, so no retries are needed.
+        Works well when contention is HIGH, but the application must handle the
+        "not enough stock" case when rowcount==0.
+        This is
+        the simplest correct option when the rule fits in a single WHERE clause.
+        """
+        async with self._session.begin():
+            product_exist = (await self._session.execute(
+                select(func.count()).select_from(Product).where(Product.id == product_id)
+            )).scalars()
+            if not product_exist:
+                raise HTTPException(
+                    detail="Product not found", status_code=status.HTTP_404_NOT_FOUND
+                )
+            result = await self._session.execute(
+                update(Product).where(
+                    Product.id == product_id, Product.stock >= quantity
+                ).values(stock=Product.stock - quantity)
+            )
+            if result.rowcount == 0:
+                raise HTTPException(
+                    detail="Not enough stock", status_code=status.HTTP_400_BAD_REQUEST
+                )
+            return await self._record_reservation(
+                product_id=product_id, quantity=quantity
+            )
+
 
     @staticmethod
     def _next_version(version: int):
