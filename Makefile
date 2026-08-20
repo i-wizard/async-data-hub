@@ -28,3 +28,6 @@ load-customers:
 # and the balance constraint; requires the stack to already be up.
 simulate-payments:
 	$(COMPOSE) exec $(SERVICE) python -m scripts.payment.simulate_payment
+
+simulate-inventory:
+	$(COMPOSE) exec $(SERVICE) python -m scripts.inventory.simulate

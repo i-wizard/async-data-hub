@@ -53,7 +53,7 @@ async def count_reservations(
     return response
 
 
-@router.post("/products/{product_id}/reserve", response_model=ProductReservationResponse)
+@router.post("/products/{product_id}/reserve/{strategy}", response_model=ProductReservationResponse)
 async def reserve_product(
     product_id: str,
     strategy: ReserveStrategy,
