@@ -201,7 +201,7 @@ class PaymentService:
         )
         acquired = await self._cache.setnx(
             key=cache_key,
-            value=processing_record,
+            value=json.dumps(processing_record),
             ttl_seconds=self.processing_record_ttl_seconds,
         )
         if not acquired:

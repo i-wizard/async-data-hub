@@ -28,6 +28,7 @@ from app.schemas.inventory import (
     ProductReservationResponse,
     ReserveStrategy,
 )
+from app.utils.distributed_lock import DistributedLock, LockUnavailable
 
 # An artificial pause between read and write, used ONLY by the racy strategies
 # (naive, locked) to widen the race window so demos reliably show the effect.
@@ -85,6 +86,7 @@ class InventoryService:
             ReserveStrategy.OPTIMISTIC: self._reserve_optimistic,
             ReserveStrategy.PESSIMISTIC: self._reserve_pessimistic,
             ReserveStrategy.ATOMIC: self.reserve_atomic,
+            ReserveStrategy.LOCKED: self.reserve_distributed_lock
         }
         return await handlers[strategy](product_id, quantity)
 
@@ -224,6 +226,41 @@ class InventoryService:
                 )
             return await self._record_reservation(
                 product_id=product_id, quantity=quantity
+            )
+    async def reserve_distributed_lock(self, product_id: str, quantity: int):
+        """
+        Serialize the critical section with a Redis distributed lock.
+
+        The body is the SAME racy read-modify-write as `naive`, but only one
+        holder runs it at a time across all processes, so the lost update cannot
+        happen. Useful when the invariant spans things a single DB row lock can't
+        cover (multiple rows/tables, or an external system).
+        """
+        try:
+            async with DistributedLock(cache=self._cache, lock_name=f"product:{product_id}"):
+                async with self._session.begin():
+                    stock = await self._session.scalar(
+                        select(Product.stock).where(Product.id == product_id)
+                    )
+                    if stock is None:
+                        raise HTTPException(
+                            detail="Product not found", status_code=status.HTTP_404_NOT_FOUND
+                        )
+                    if stock < quantity:
+                        raise HTTPException(
+                            detail="Not enough stock", status_code=status.HTTP_400_BAD_REQUEST
+                        )
+                    await asyncio.sleep(RACE_WINDOW_SECONDS)
+                    await self._session.execute(
+                        update(Product).where(Product.id == product_id).values(stock=stock-quantity)
+                    )
+                    return await self._record_reservation(
+                        product_id=product_id, quantity=quantity
+                    )
+        except LockUnavailable:
+            raise HTTPException(
+                detail="Could not acquire lock; please try again",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
 
