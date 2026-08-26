@@ -133,7 +133,7 @@ class AsyncCache:
         ttl = ttl_seconds or self._default_ttl_seconds
 
         if self._redis_client is not None:
-            result = await self._redis_client.set(name=key, value=json.dumps(value), ex=ttl, nx=True)
+            result = await self._redis_client.set(name=key, value=value, ex=ttl, nx=True)
             return result is True
 
         if not self._allow_in_memory_fallback:
@@ -144,3 +144,34 @@ class AsyncCache:
                 return False
             self._memory_store[key] = {"value": value, "expires_at": time.time() + ttl}
             return True
+
+    async def eval(self, script: str, num_keys: int, *keys_and_args) -> Any:
+        """
+        Evaluates a Lua script in the cache. This is used for atomic operations.
+        """
+
+        if self._redis_client is not None:
+            return await self._redis_client.eval(script, num_keys, *keys_and_args)
+
+        if not self._allow_in_memory_fallback:
+            raise NotImplementedError("Lua script evaluation is not supported in in-memory fallback.")
+
+        # For in-memory fallback, we can only support a limited set of scripts.
+        # Here we implement the specific script used for releasing locks.
+        if script.strip() == """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            else
+                return 0
+            end
+            """.strip():
+            key = keys_and_args[0]
+            token = keys_and_args[1]
+            async with self._lock:
+                record = self._memory_store.get(key)
+                if record and record["value"] == token:
+                    del self._memory_store[key]
+                    return 1
+                return 0
+
+        raise NotImplementedError("Only the lock release script is supported in in-memory fallback.")

@@ -28,6 +28,7 @@ from app.schemas.inventory import (
     ProductReservationResponse,
     ReserveStrategy,
 )
+from app.utils.distributed_lock import DistributedLock, LockUnavailable
 
 # An artificial pause between read and write, used ONLY by the racy strategies
 # (naive, locked) to widen the race window so demos reliably show the effect.
@@ -84,6 +85,8 @@ class InventoryService:
             ReserveStrategy.NAIVE: self._reserve_naive,
             ReserveStrategy.OPTIMISTIC: self._reserve_optimistic,
             ReserveStrategy.PESSIMISTIC: self._reserve_pessimistic,
+            ReserveStrategy.ATOMIC: self.reserve_atomic,
+            ReserveStrategy.LOCKED: self.reserve_distributed_lock
         }
         return await handlers[strategy](product_id, quantity)
 
@@ -194,6 +197,72 @@ class InventoryService:
             return await self._record_reservation(
                 product_id=product_id, quantity=quantity
             )
+    async def reserve_atomic(self, product_id: str, quantity: int):
+        """
+        One UPDATE ... SET stock=stock-qty WHERE stock>=qty (DB does CAS).
+
+        The database itself does the atomic check-and-set, so no retries are needed.
+        Works well when contention is HIGH, but the application must handle the
+        "not enough stock" case when rowcount==0.
+        This is
+        the simplest correct option when the rule fits in a single WHERE clause.
+        """
+        async with self._session.begin():
+            product_exist = (await self._session.execute(
+                select(func.count()).select_from(Product).where(Product.id == product_id)
+            )).scalars()
+            if not product_exist:
+                raise HTTPException(
+                    detail="Product not found", status_code=status.HTTP_404_NOT_FOUND
+                )
+            result = await self._session.execute(
+                update(Product).where(
+                    Product.id == product_id, Product.stock >= quantity
+                ).values(stock=Product.stock - quantity)
+            )
+            if result.rowcount == 0:
+                raise HTTPException(
+                    detail="Not enough stock", status_code=status.HTTP_400_BAD_REQUEST
+                )
+            return await self._record_reservation(
+                product_id=product_id, quantity=quantity
+            )
+    async def reserve_distributed_lock(self, product_id: str, quantity: int):
+        """
+        Serialize the critical section with a Redis distributed lock.
+
+        The body is the SAME racy read-modify-write as `naive`, but only one
+        holder runs it at a time across all processes, so the lost update cannot
+        happen. Useful when the invariant spans things a single DB row lock can't
+        cover (multiple rows/tables, or an external system).
+        """
+        try:
+            async with DistributedLock(cache=self._cache, lock_name=f"product:{product_id}"):
+                async with self._session.begin():
+                    stock = await self._session.scalar(
+                        select(Product.stock).where(Product.id == product_id)
+                    )
+                    if stock is None:
+                        raise HTTPException(
+                            detail="Product not found", status_code=status.HTTP_404_NOT_FOUND
+                        )
+                    if stock < quantity:
+                        raise HTTPException(
+                            detail="Not enough stock", status_code=status.HTTP_400_BAD_REQUEST
+                        )
+                    await asyncio.sleep(RACE_WINDOW_SECONDS)
+                    await self._session.execute(
+                        update(Product).where(Product.id == product_id).values(stock=stock-quantity)
+                    )
+                    return await self._record_reservation(
+                        product_id=product_id, quantity=quantity
+                    )
+        except LockUnavailable:
+            raise HTTPException(
+                detail="Could not acquire lock; please try again",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
 
     @staticmethod
     def _next_version(version: int):
