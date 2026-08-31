@@ -2,7 +2,17 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, text as sql_text
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    text as sql_text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from uuid6 import uuid7
@@ -91,14 +101,20 @@ class WebhookDeliveryAttemptRecord(Base):
 
 
 class CustomerAccount(Base):
-    __tablename__ = 'customer_accounts'
+    __tablename__ = "customer_accounts"
     __table_args__ = (
-        CheckConstraint("balance >= 0", name="ck_customer_accounts_balance_non_negative"),
+        CheckConstraint(
+            "balance >= 0", name="ck_customer_accounts_balance_non_negative"
+        ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid7
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # minor units (cents)
+    balance: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )  # minor units (cents)
 
 
 class Charge(Base):
@@ -122,14 +138,15 @@ class Charge(Base):
         String, primary_key=True, default=lambda: f"ch_{uuid.uuid4().hex}"
     )
     amount: Mapped[int] = mapped_column(Integer, nullable=False)  # minor units (cents)
-    customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("customer_accounts.id"), nullable=False)
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("customer_accounts.id"), nullable=False
+    )
     status: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=current_datetime
     )
     idempotency_key: Mapped[str] = mapped_column(String, nullable=False)
     error_message: Mapped[str] = mapped_column(String, nullable=True)
-
 
 
 class Product(Base):
@@ -145,7 +162,9 @@ class Product(Base):
 
     __tablename__ = "products"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid7
+    )
     name: Mapped[str] = mapped_column(String, nullable=False)
     stock: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -159,8 +178,24 @@ class ProductReservation(Base):
     sum of reserved quantities must never exceed the stock that originally existed.
     Counting rows is how the demos/tests detect a race that let too many through.
     """
+
     __tablename__ = "product_reservations"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
-    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid7
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), nullable=False, index=True
+    )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=current_datetime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=current_datetime
+    )
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    content: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=current_datetime, onupdate=current_datetime
+    )

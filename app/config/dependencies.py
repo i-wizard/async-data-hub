@@ -8,6 +8,7 @@ from app.cache.redis_cache import AsyncCache
 from app.config.settings import Settings, get_settings
 from app.core.state import AppState
 from app.services.aggregation_service import AggregationService
+from app.services.consistency import ConsistencyService
 from app.services.cpu_service import CpuAnalysisService
 from app.services.health_service import HealthService
 from app.services.inventory_service import InventoryService
@@ -168,3 +169,13 @@ def inventory_service(
     """
 
     return InventoryService(session=session, cache=cache)
+
+def consistency_service(
+    session: AsyncSession = Depends(db_session),
+) -> ConsistencyService:
+    """
+    Provides the consistency service through dependency injection so consistency logic
+    can reuse the shared database session and cache.
+    """
+
+    return ConsistencyService(session=session)

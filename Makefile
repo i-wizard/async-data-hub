@@ -1,4 +1,5 @@
 COMPOSE := docker compose
+COMPOSE2 := docker compose -f docker-compose.dbrpl.yaml
 SERVICE := api
 CMD ?= bash
 
@@ -7,10 +8,15 @@ CMD ?= bash
 up:
 	$(COMPOSE) up --build
 
+up-dbrpl:
+	$(COMPOSE2) up
+
 # Wipe the postgres data too with: make down V=1
 down:
 	$(COMPOSE) down $(if $(V),--volumes)
 
+down-dbrpl:
+	$(COMPOSE2) down $(if $(V),--volumes)
 # Override the command with: make exec CMD="pytest -q"
 exec:
 	$(COMPOSE) exec $(SERVICE) $(CMD)
