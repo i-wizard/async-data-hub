@@ -1,0 +1,95 @@
+# A real streaming-replication cluster: 1 primary + 2 replicas, plus the API.
+#
+# We use the Bitnami Postgres image because it wires up streaming replication
+# from environment variables (base backup, standby.signal, primary_conninfo),
+# which keeps this compose file focused on the CONCEPTS rather than replica
+# bootstrap plumbing.
+#
+#   postgres-primary   accepts writes; streams WAL to the replicas
+#   postgres-replica1  fast async standby (read-only)
+#   postgres-replica2  DELAYED standby (recovery_min_apply_delay) so replication
+#                      lag / stale reads are reliably observable
+#
+# Synchronous (quorum) commit: the primary is configured to wait for 1 standby
+# to acknowledge each commit (POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS=1), so a
+# "quorum" write blocks until a replica confirms. The app can opt out per
+# request (synchronous_commit=local) to show async behaviour.
+
+x-pg-common: &pg-common
+  # Bitnami archived their free images to the `bitnamilegacy` org in 2025; this
+  # tag still wires up streaming replication from env vars. (If it ever
+  # disappears, the alternative is the official `postgres:16` image with a
+  # hand-rolled standby bootstrap.)
+  image: bitnamilegacy/postgresql:16
+  environment: &pg-env
+    POSTGRESQL_POSTGRES_PASSWORD: adminpass
+    POSTGRESQL_USERNAME: app
+    POSTGRESQL_PASSWORD: apppass
+    POSTGRESQL_DATABASE: async_data_hub
+    POSTGRESQL_REPLICATION_USER: repl
+    POSTGRESQL_REPLICATION_PASSWORD: replpass
+  healthcheck:
+    test: [ "CMD", "pg_isready", "-U", "postgres" ]
+    interval: 3s
+    timeout: 5s
+    retries: 30
+services:
+  postgres-primary:
+    <<: *pg-common
+    environment:
+      <<: *pg-env
+      POSTGRESQL_REPLICATION_MODE: master
+      # Wait for 1 standby to confirm each commit -> quorum/synchronous write.
+      POSTGRESQL_SYNCHRONOUS_COMMIT_MODE: "on"
+      POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS: "1"
+    ports:
+      - "5440:5432"
+
+  postgres-replica1:
+    <<: *pg-common
+    environment:
+      <<: *pg-env
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_MASTER_HOST: postgres-primary
+      POSTGRESQL_MASTER_PORT_NUMBER: "5432"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    ports:
+      - "5441:5432"
+
+  postgres-replica2:
+    <<: *pg-common
+    environment:
+      <<: *pg-env
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_MASTER_HOST: postgres-primary
+      POSTGRESQL_MASTER_PORT_NUMBER: "5432"
+    volumes:
+      - ./replica-delay.conf:/bitnami/postgresql/conf/conf.d/override.conf:ro
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    ports:
+      - "5442:5432"
+  api:
+    build:
+      context: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://app:apppass@postgres-primary:5432/async_data_hub
+      DATABASE_URL_REPLICA1: postgresql+asyncpg://app:apppass@postgres-replica1:5432/async_data_hub
+      DATABASE_URL_REPLICA2: postgresql+asyncpg://app:apppass@postgres-replica2:5432/async_data_hub
+      DATABASE_URL_ADMIN: postgresql+asyncpg://postgres:adminpass@postgres-primary:5432/async_data_hub
+      REPLICATION_AVAILABILITY: "true"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica1:
+        condition: service_healthy
+      postgres-replica2:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"

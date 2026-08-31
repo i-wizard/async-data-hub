@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         default="sqlite+aiosqlite:///./async_data_hub.db",
         alias="DATABASE_URL",
     )
+
     redis_url: str = Field(default="memory://", alias="REDIS_URL")
     http_timeout_seconds: float = Field(default=50.0, alias="HTTP_TIMEOUT_SECONDSs")
     http_concurrency_limit: int = Field(default=10, alias="HTTP_CONCURRENCY_LIMIT")
@@ -67,6 +68,20 @@ class Settings(BaseSettings):
         default=64 * 1024,
         alias="REMOTE_MEDIA_CHUNK_SIZE",
     )
+
+    # REPLICATION CONFIG
+    database_replica_url: Optional[str] = Field(
+        default=None, alias="DATABASE_URL_REPLICA1"
+    )
+    database_replica_url2: Optional[str] = Field(
+        default=None, alias="DATABASE_URL_REPLICA2"
+    )
+    database_admin_url: str = Field(
+        default="postgresql+asyncpg://postgres:adminpass@localhost:5440/consistency",
+        alias="DATABASE_URL_ADMIN",
+    )
+    replication_availability: bool = Field(default=False, alias="REPLICATION_AVAILABILITY")
+
 
     @field_validator(
         "frontend_origins",
