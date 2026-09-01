@@ -37,3 +37,6 @@ simulate-payments:
 
 simulate-inventory:
 	$(COMPOSE) exec $(SERVICE) python -m scripts.inventory.simulate
+
+simulate-consistency:
+	$(COMPOSE2) exec $(SERVICE) python -m scripts.consistency.simulate
