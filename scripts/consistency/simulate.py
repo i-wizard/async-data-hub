@@ -85,5 +85,131 @@ async def replication_lag():
         )
 
 
+async def read_your_writes():
+    """
+    Demo 02 — READ-AFTER-WRITE (a.k.a. read-your-writes) and two fixes.
+
+    A user updates a value, then immediately reads it back. If the read is served by
+    a lagging replica, they see their OLD value — a confusing "did my save work?"
+    bug. Two standard fixes:
+
+      Fix A — route the read to the PRIMARY (always current).
+      Fix B — pin the read to the write's WAL LSN: wait until the replica has
+              replayed up to that LSN, then read (read-your-writes from a replica).
+
+    Run (inside the api container):  python demos/02_read_after_write.py
+    """
+    async with httpx.AsyncClient(timeout=30) as client:
+        doc_id = new_id()
+        # Seed v1 and make sure the delayed replica has it (so the anomaly below
+        # is a STALE VALUE, not just a missing row).
+        first_content = "v1"
+        first = await write(client, doc_id, first_content, durability="async")
+        await read(client, doc_id, source="replica2", wait_for_lsn=first["write_lsn"])
+
+        # Update to v2, then immediately read the delayed replica
+        second_content = "v2"
+        second = await write(client, doc_id, second_content, durability="async")
+        anomaly = await read(client, doc_id, source="replica2", wait_for_lsn=None)
+        print(f"just wrote v2; replica2 now returns : {anomaly['content']!r}")
+        if anomaly["content"] == first_content:
+            print("  -> ❌ read-after-write anomaly: the user sees their OLD value")
+
+        # Fix A: read the primary.
+        fix_primary = await read(client, doc_id, source="primary", wait_for_lsn=None)
+        print(f"fix A  read primary                 : {fix_primary['content']!r}")
+        assert fix_primary["content"] == second_content
+
+        # Fix B: wait for the replica to reach the write's LSN, then read it.
+        fix_lsn = await read(
+            client, doc_id, source="replica2", wait_for_lsn=second["write_lsn"]
+        )
+        print(
+            f"fix B  replica2 wait_for_lsn        : {fix_lsn['content']!r}  (up_to_date={fix_lsn['up_to_date']})"
+        )
+
+        assert fix_lsn["content"] == second_content
+        assert fix_lsn["up_to_date"] is True
+
+        print(
+            "\n✅ Read-after-write guaranteed by routing to the primary, or by waiting for the LSN."
+        )
+
+
+async def quorum_and_status():
+    """
+    Demo 03 — QUORUM (synchronous) writes and the replication overview.
+
+    The primary is configured to wait for one standby to acknowledge each commit
+    (a quorum/synchronous write). This trades a little latency for the guarantee
+    that an acknowledged write survives a primary failure and is already on a
+    replica. The app can opt out per request (async) for lower latency.
+
+    This demo shows the cluster's replication status and that both durability levels
+    succeed while the replicas are healthy. The CAP behaviour under a PARTITION
+    (quorum writes block; async writes still succeed) is a manual exercise — see the
+    README's "CAP under a partition" section (it requires pausing containers).
+
+    Run (inside the api container):  python demos/03_quorum_and_status.py
+    """
+    async with httpx.AsyncClient(timeout=30) as client:
+        status = await replication_status(client)
+        print(f"primary LSN: {status['primary_lsn']}")
+        print("standbys (from pg_stat_replication):")
+        for standby in status["standbys"]:
+            print(
+                f"  - {standby['application_name']:<16} state={standby['state']:<10} "
+                f"sync_state={standby['sync_state']:<10} lag={standby['replay_lag_seconds']}"
+            )
+        # At least one standby should be streaming; typically both.
+        assert len(status["standbys"]) >= 1
+
+        # With NUM_SYNCHRONOUS_REPLICAS=1, at least one standby is sync/quorum.
+        sync_states = {s["sync_state"] for s in status["standbys"]}
+        print(f"\nsync_state values present: {sync_states}")
+
+        # Both durability levels succeed while replicas are healthy.
+        q = await write(client, new_id(), "quorum-write", durability="quorum")
+        a = await write(client, new_id(), "async-write", durability="async")
+        print(
+            f"quorum write committed at LSN {q['write_lsn']} (waited for a standby ack)"
+        )
+        print(f"async  write committed at LSN {a['write_lsn']} (no wait)")
+
+        assert any(
+            state in {"sync", "quorum"} for state in sync_states
+        ), "expected at least one synchronous standby"
+        print(
+            "\n✅ A synchronous standby backs quorum writes; async writes skip the wait."
+        )
+        print(
+            "   (Partition behaviour — quorum blocks, async proceeds — is in the README.)"
+        )
+
+
+async def run_with_partition():
+    """
+    Demo 04 — QUORUM (synchronous) writes under a PARTITION.
+
+    This demo is a manual exercise — it requires pausing containers to simulate a
+    network partition. >>> make pause-replicas
+
+    A quorum write timeout while the replicas are unreachable, but async writes still succeed.
+    This is a classic CAP tradeoff: the system is available (async writes succeed) but not consistent (quorum writes fail).
+    But for Quorum writes, the system is consistent (they fail) but not available (they block).
+    """
+    async with httpx.AsyncClient(timeout=15) as client:
+        q = write(client, new_id(), "quorum-write", durability="quorum")
+        a = write(client, new_id(), "async-write", durability="async")
+        results = await asyncio.gather(q, a, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                print(f"quorum write failed: {result}")
+            else:
+                print(
+                    f"async write succeeded: {result['durability']} write committed at LSN {result['write_lsn']}"
+                )
+
+
 if __name__ == "__main__":
-    asyncio.run(replication_lag())
+    asyncio.run(run_with_partition())

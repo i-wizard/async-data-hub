@@ -17,6 +17,9 @@ down:
 
 down-dbrpl:
 	$(COMPOSE2) down $(if $(V),--volumes)
+
+pause-replicas:
+	$(COMPOSE2) pause postgres-replica1 postgres-replica2
 # Override the command with: make exec CMD="pytest -q"
 exec:
 	$(COMPOSE) exec $(SERVICE) $(CMD)
