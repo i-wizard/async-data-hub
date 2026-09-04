@@ -11,7 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    text as sql_text,
+    text as sql_text, BigInteger,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -199,3 +199,12 @@ class Document(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=current_datetime, onupdate=current_datetime
     )
+
+
+
+
+class Account(Base):
+    __tablename__ = 'accounts'
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    owner: Mapped[str] = mapped_column(String, nullable=False)
+    balance: Mapped[int] = mapped_column(BigInteger, nullable=False)  # balance in minor units (cents)
