@@ -43,3 +43,6 @@ simulate-inventory:
 
 simulate-consistency:
 	$(COMPOSE2) exec $(SERVICE) python -m scripts.consistency.simulate
+
+simulate-db-concurrency:
+	$(COMPOSE) exec $(SERVICE) python -m scripts.db_concurrency.simulate

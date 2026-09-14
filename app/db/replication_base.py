@@ -25,12 +25,13 @@ REPLICA1 = "replica1"
 REPLICA2 = "replica2"
 REPLICAS = (REPLICA1, REPLICA2)
 
-
-engines: Dict[str, AsyncEngine] = {
-    PRIMARY: create_async_engine(settings.database_url),
-    REPLICA1: create_async_engine(settings.database_replica_url),
-    REPLICA2: create_async_engine(settings.database_replica_url2),
-}
+engines = {}
+if settings.replication_availability:
+    engines: Dict[str, AsyncEngine] = {
+        PRIMARY: create_async_engine(settings.database_url),
+        REPLICA1: create_async_engine(settings.database_replica_url),
+        REPLICA2: create_async_engine(settings.database_replica_url2),
+    }
 
 session_factories: Dict[str, async_sessionmaker[AsyncSession]] = {
     node: async_sessionmaker(bind=engine, expire_on_commit=False)
