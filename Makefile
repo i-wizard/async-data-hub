@@ -17,6 +17,9 @@ down:
 
 down-dbrpl:
 	$(COMPOSE2) down $(if $(V),--volumes)
+
+pause-replicas:
+	$(COMPOSE2) pause postgres-replica1 postgres-replica2
 # Override the command with: make exec CMD="pytest -q"
 exec:
 	$(COMPOSE) exec $(SERVICE) $(CMD)
@@ -37,3 +40,12 @@ simulate-payments:
 
 simulate-inventory:
 	$(COMPOSE) exec $(SERVICE) python -m scripts.inventory.simulate
+
+simulate-consistency:
+	$(COMPOSE2) exec $(SERVICE) python -m scripts.consistency.simulate
+
+simulate-db-concurrency:
+	$(COMPOSE) exec $(SERVICE) python -m scripts.db_concurrency.simulate
+
+simulate-db-lock:
+	$(COMPOSE) exec $(SERVICE) python -m scripts.db_lock.simulate

@@ -11,8 +11,9 @@ Requires-Dist: fastapi>=0.115.0
 Requires-Dist: httpx>=0.28.0
 Requires-Dist: pydantic-settings>=2.6.0
 Requires-Dist: redis>=5.2.0
-Requires-Dist: sqlalchemy>=2.0.36
+Requires-Dist: sqlalchemy[asyncio]>=2.0.36
 Requires-Dist: uvicorn[standard]>=0.32.0
+Requires-Dist: uuid6==2024.7.10
 Provides-Extra: dev
 Requires-Dist: fakeredis>=2.26.0; extra == "dev"
 Requires-Dist: pytest>=8.3.0; extra == "dev"
