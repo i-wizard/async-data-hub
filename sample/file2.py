@@ -1,3 +1,4 @@
+import argparse
 import subprocess
 import threading
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -5,6 +6,8 @@ from contextvars import ContextVar
 from multiprocessing.pool import ThreadPool
 from time import sleep
 from typing import Callable
+
+from functools import lru_cache
 
 counter = 0
 lock = threading.Lock()
@@ -90,8 +93,6 @@ def bulk_deposit(account: Callable[[], None], amount, times):
         thread.join()
 
 
-
-
 class ThreadJoinSample:
     @staticmethod
     def _test_writing_while_process_exits():
@@ -100,6 +101,7 @@ class ThreadJoinSample:
         with open("test.txt", "w") as f:
             f.write("Hello, world!")
         print("File written.")
+
     @staticmethod
     def delayed_task():
         print("Starting delayed task...")
@@ -110,10 +112,14 @@ class ThreadJoinSample:
 
     @classmethod
     def _test_thread_join(cls):
-        print(f"{threading.current_thread().name} running the _test_thread_join function")
+        print(
+            f"{threading.current_thread().name} running the _test_thread_join function"
+        )
         thread = threading.Thread(target=cls.delayed_task, name="DelayedTaskThread")
         write_file_thread = threading.Thread(
-            target=cls._test_writing_while_process_exits, name="WriteFileThread", daemon=True
+            target=cls._test_writing_while_process_exits,
+            name="WriteFileThread",
+            daemon=True,
         )
         thread.start()
         print(f"{threading.current_thread().name} could be doing other things")
@@ -128,6 +134,7 @@ class ContextVarSample:
     def fun1(self):
         token = self.my_var.set(True)
         print(self.my_var.get())
+
     def fun2(self):
         print(self.my_var.get())
         token = self.my_var.set(False)
@@ -137,8 +144,44 @@ class ContextVarSample:
 
 
 def run_script():
-    result = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+    result = subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"], text=True
+    ).strip()
     print("res", result)
+
+
+def args_check():
+    parser = argparse.ArgumentParser(
+        description="Run a script with optional arguments.", prog="MyScript"
+    )
+    parser.add_argument("--name", type=str, help="Your name")
+    parser.add_argument("--print", action="store_true")
+    parser.add_argument("--check", action="store_false", dest="check2")
+    parser.add_argument("--check2", action="store_true")
+    parser.add_argument("--tags", action="append")
+    # parser.add_argument("color", type=str)
+    subparser = parser.add_subparsers(dest="subcmds")
+    color_parser = subparser.add_parser("color")
+    color_parser.add_argument("--shade")
+
+    shape_parser = subparser.add_parser("shape")
+    shape_parser.add_argument("--size", type=int)
+    # parser.add_argument("black", type=str, dest='color')
+    print("args", parser.parse_args())
+
+@lru_cache(maxsize=10)
+def saved_num():
+    print("saved_num ran")
+    return 1
+
+
+def check_saved_num():
+    count = 5
+    for _ in range(5):
+        num = saved_num()
+        print(num)
+    return
+
 
 if __name__ == "__main__":
     # account = BankAccount()
@@ -149,4 +192,4 @@ if __name__ == "__main__":
 
     # ContextVarSample().fun1()
     # ContextVarSample().fun2()
-    run_script()
+    check_saved_num()

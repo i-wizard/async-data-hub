@@ -211,7 +211,7 @@ class Account(Base):
 
 
 class DbQueueJob(Base):
-    __tablename__ = "db_queue_jobs"
+    __table__name = "db_queue_jobs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda : f"job_{uuid.uuid4().hex[:12]}")
     # Monotonic FIFO ordering key, assigned by the database on insert.

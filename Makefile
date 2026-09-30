@@ -46,3 +46,6 @@ simulate-consistency:
 
 simulate-db-concurrency:
 	$(COMPOSE) exec $(SERVICE) python -m scripts.db_concurrency.simulate
+
+simulate-db-lock:
+	$(COMPOSE) exec $(SERVICE) python -m scripts.db_lock.simulate
