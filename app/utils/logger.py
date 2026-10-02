@@ -68,3 +68,16 @@ def configure_logging(log_level: str) -> None:
         level=getattr(logging, log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+
+
+_CONFIGURED = False
+def get_observability_logger(name: Optional[str]) -> logging.Logger:
+    """Return a configured logger; configures the root handler once."""
+    global _CONFIGURED
+    if not _CONFIGURED:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)-7s %(name)s | %(message)s",
+        )
+        _CONFIGURED = True
+    return logging.getLogger(name or "metrics_observability")

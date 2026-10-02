@@ -13,6 +13,7 @@ from app.api.routes.payment import router as payment_router
 from app.api.routes.inventory import router as inventory_router
 from app.api.routes.consistency import router as consistency_router
 from app.api.routes.db_lock import router as db_lock_router
+from app.api.routes.observability import router as observability_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router, tags=["health"])
@@ -28,3 +29,4 @@ api_router.include_router(payment_router, tags=["payments"])
 api_router.include_router(inventory_router, tags=["inventory"])
 api_router.include_router(consistency_router, tags=["consistency"])
 api_router.include_router(db_lock_router, tags=["DB lock"])
+api_router.include_router(observability_router, tags=["observability"])

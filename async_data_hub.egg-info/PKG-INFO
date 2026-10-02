@@ -14,6 +14,7 @@ Requires-Dist: redis>=5.2.0
 Requires-Dist: sqlalchemy[asyncio]>=2.0.36
 Requires-Dist: uvicorn[standard]>=0.32.0
 Requires-Dist: uuid6==2024.7.10
+Requires-Dist: prometheus-client<0.22,>=0.20
 Provides-Extra: dev
 Requires-Dist: fakeredis>=2.26.0; extra == "dev"
 Requires-Dist: pytest>=8.3.0; extra == "dev"

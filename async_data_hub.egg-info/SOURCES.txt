@@ -15,6 +15,7 @@ app/api/routes/inventory.py
 app/api/routes/media.py
 app/api/routes/mock_sources.py
 app/api/routes/mock_webhooks.py
+app/api/routes/observability.py
 app/api/routes/payment.py
 app/api/routes/streams.py
 app/api/routes/webhooks.py
@@ -43,6 +44,7 @@ app/schemas/db_concurrency.py
 app/schemas/health.py
 app/schemas/inventory.py
 app/schemas/media.py
+app/schemas/observability.py
 app/schemas/payment.py
 app/schemas/streams.py
 app/schemas/webhooks.py
@@ -55,6 +57,7 @@ app/services/db_lock_service.py
 app/services/health_service.py
 app/services/inventory_service.py
 app/services/media_service.py
+app/services/observability.py
 app/services/payment_service.py
 app/services/webhook_service.py
 app/streaming/__init__.py

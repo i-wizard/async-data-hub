@@ -15,6 +15,10 @@ from app.services.db_lock_service import DBLockService
 from app.services.health_service import HealthService
 from app.services.inventory_service import InventoryService
 from app.services.media_service import MediaService
+from app.services.observability import (
+    ObservabilityOrderService,
+    ObservabilityStatsService,
+)
 from app.services.payment_service import PaymentService
 from app.services.webhook_service import WebhookService
 from app.utils.http import SharedHttpClient
@@ -188,6 +192,13 @@ def db_concurrency_service(session: AsyncSession = Depends(db_session)):
     return DBConcurrencyService(session=session)
 
 
-
 def db_lock_service(session: AsyncSession = Depends(db_session)):
     return DBLockService(session=session)
+
+
+def observability_order_service(connection: HTTPConnection):
+    return ObservabilityOrderService(store=connection.app.state.orders)
+
+
+def observability_stat_service(connection: HTTPConnection):
+    return ObservabilityStatsService(samples=connection.app.state.samples)
